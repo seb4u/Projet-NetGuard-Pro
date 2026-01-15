@@ -6,18 +6,16 @@ Base = declarative_base()
 
 class Agent(Base):
     __tablename__ = 'agents'
-
     id = Column(Integer, primary_key=True)
     agent_id = Column(String(50), unique=True, nullable=False)
     hostname = Column(String(100))
     ip_address = Column(String(45))
-    status = Column(String(20))  # active, inactive, error
+    status = Column(String(20))
     last_heartbeat = Column(DateTime, default=datetime.now)
     created_at = Column(DateTime, default=datetime.now)
 
 class TrafficData(Base):
     __tablename__ = 'traffic_data'
-
     id = Column(Integer, primary_key=True)
     agent_id = Column(String(50))
     timestamp = Column(DateTime, default=datetime.now)
@@ -30,21 +28,19 @@ class TrafficData(Base):
 
 class Alert(Base):
     __tablename__ = 'alerts'
-
     id = Column(Integer, primary_key=True)
-    alert_type = Column(String(50))  # PORT_SCAN, SYN_FLOOD, etc.
-    severity = Column(String(20))  # LOW, MEDIUM, HIGH, CRITICAL
+    alert_type = Column(String(50))
+    severity = Column(String(20))
     source_ip = Column(String(45))
     target_ip = Column(String(45))
     description = Column(Text)
-    details = Column(Text)  # JSON avec détails techniques
+    details = Column(Text)
     timestamp = Column(DateTime, default=datetime.now)
     acknowledged = Column(Boolean, default=False)
     resolved = Column(Boolean, default=False)
 
 class Statistics(Base):
     __tablename__ = 'statistics'
-
     id = Column(Integer, primary_key=True)
     timestamp = Column(DateTime, default=datetime.now)
     total_packets = Column(Integer)
@@ -52,10 +48,8 @@ class Statistics(Base):
     active_agents = Column(Integer)
     avg_packets_per_second = Column(Float)
 
-# Connexion à la base SQLite (ou remplace par PostgreSQL/MySQL si besoin)
-engine = create_engine('sqlite:///netguard.db')
-
-# Création des tables
+# Créer la base SQLite
+engine = create_engine("sqlite:///netguard.db")
 Base.metadata.create_all(engine)
 
-print("✅ Base de données créée avec succès.")
+print("✅ Base de données netguard.db créée avec succès.")
