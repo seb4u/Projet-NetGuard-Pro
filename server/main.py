@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from traffic import router as traffic_router
 from models import Agent, TrafficData, Alert, Statistics, Base
 from alerts import router as alerts_router
+from receiver import router as receiver_router
 from dashboard import router as dashboard_router
 import uuid
 
@@ -15,6 +16,8 @@ app = FastAPI()
 app.include_router(traffic_router)
 app.include_router(alerts_router, prefix="/api/alerts", tags=["Alertes"])
 app.include_router(dashboard_router, tags=["Dashboard"])
+app.include_router(receiver_router)
+
 
 # Configuration de la base de données
 DATABASE_URL = 'sqlite:///netguard.db'
