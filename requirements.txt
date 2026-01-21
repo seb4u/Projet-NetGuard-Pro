@@ -1,5 +1,9 @@
 fastapi
 uvicorn
 sqlalchemy
+requests
 python-dotenv
-dotenv
+passlib[bcrypt]
+python-multipart
+passlib
+CryptContext
