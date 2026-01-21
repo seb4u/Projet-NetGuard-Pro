@@ -17,8 +17,7 @@ class PacketSniffer:
         """
         try:
             if packet.haslayer(scapy.IP):
-                if self.packet_callback:
-                    self.packet_callback(packet)
+                self.packet_callback(packet)
         except Exception as e:
             print(f"[!] Erreur traitement paquet : {e}")
 

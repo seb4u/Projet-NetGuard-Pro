@@ -1,38 +1,38 @@
-from client import SocketClient
-from datetime import datetime, timezone
-from sniffer import PacketSniffer
+from agent.sniffer import PacketSniffer
+from agent.detectors.port_scan import PortScanDetector
+from agent.detectors.syn_flood import SynFloodDetector
 
-client = SocketClient(
-    server_host="localhost",
-    server_port=9999,
-    agent_id="agent-001"
+# Détecteurs
+port_scan_detector = PortScanDetector(
+    time_window=60,
+    port_threshold=5
 )
 
-client.connect()
-client.register()
-
-
-alert = {
-    "alert_type": "PORT_SCAN",
-    "severity": "MEDIUM",
-    "source_ip": "10.5.2.184",
-    "target_ip": "8.8.8.8",
-    "protocol": "TCP",
-    "details": {
-        "ports_scanned": 443,
-        "time_window": 60
-    },
-    "timestamp": datetime.now(timezone.utc).isoformat()
-}
-client.send_alert(alert)
-
+syn_flood_detector = SynFloodDetector(
+    time_window=10,
+    syn_threshold=30
+)
 
 def process_packet(packet):
-    print(packet.summary())
+    alert = port_scan_detector.process_packet(packet)
+    if alert:
+        print("\n🚨 ALERTE PORT SCAN 🚨")
+        print(alert)
 
-sniffer = PacketSniffer(
-    interface="Wi-Fi",
-    packet_callback=process_packet
-)
+    alert = syn_flood_detector.process_packet(packet)
+    if alert:
+        print("\n🔥 ALERTE SYN FLOOD 🔥")
+        print(alert)
 
-sniffer.start()
+# Interfaces Windows à surveiller
+interfaces = ["Wi-Fi", "Ethernet"]
+
+for iface in interfaces:
+    try:
+        sniffer = PacketSniffer(
+            interface=iface,
+            packet_callback=process_packet
+        )
+        sniffer.start()
+    except Exception as e:
+        print(f"[!] Interface {iface} ignorée : {e}")
