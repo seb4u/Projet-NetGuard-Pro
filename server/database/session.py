@@ -1,15 +1,16 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = None  # fourni par étudiant A
+DATABASE_URL = "sqlite:///netguard.db"  # fourni par étudiant A
 
-engine = None
-SessionLocal = None
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    future=True
+)
 
-def init_db():
-    global engine, SessionLocal
-    if DATABASE_URL is None:
-        raise RuntimeError("DATABASE_URL non fournie")
-
-    engine = create_engine(DATABASE_URL)
-    SessionLocal = sessionmaker(bind=engine)
+SessionLocal = sessionmaker(
+    bind=engine,
+    autoflush=False,
+    autocommit=False
+)
