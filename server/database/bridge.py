@@ -1,8 +1,8 @@
-import json
 from datetime import datetime
+import json
+
 from server.database.session import SessionLocal
 from server.database.models import Agent, Alert
-
 
 def upsert_agent(agent_id: str, status="ONLINE"):
     db = SessionLocal()
