@@ -1,47 +1,27 @@
-/* ===============================
-   DASHBOARD JS — ÉTUDIANT C
-   =============================== */
+async function refresh() {
+    const overview = await fetch("/api/dashboard/overview").then(r => r.json());
+    document.getElementById("overview").innerText =
+        `Agents actifs : ${overview.agents} | Alertes : ${overview.alerts}`;
 
-function loadDashboard() {
+    const agents = await fetch("/api/dashboard/agents").then(r => r.json());
+    const agentsUl = document.getElementById("agents");
+    agentsUl.innerHTML = "";
+    agents.forEach(a => {
+        const li = document.createElement("li");
+        li.textContent = `${a.agent_id} — ${a.status}`;
+        agentsUl.appendChild(li);
+    });
 
-    // Vue d’ensemble
-    fetch("/api/dashboard/overview")
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById("overview").innerText =
-                `Agents actifs : ${data.agents} | Alertes : ${data.alerts}`;
-        });
-
-    // Agents actifs
-    fetch("/api/dashboard/agents")
-        .then(response => response.json())
-        .then(data => {
-            const ul = document.getElementById("agents");
-            ul.innerHTML = "";
-            data.forEach(agent => {
-                const li = document.createElement("li");
-                li.textContent = agent.agent_id ?? agent;
-                ul.appendChild(li);
-            });
-        });
-
-    // Alertes récentes
-    fetch("/api/dashboard/alerts")
-        .then(response => response.json())
-        .then(data => {
-            const ul = document.getElementById("alerts");
-            ul.innerHTML = "";
-            data.forEach(alert => {
-                const li = document.createElement("li");
-                li.className = alert.severity.toLowerCase();
-                li.textContent =
-                    `[${alert.severity}] ${alert.alert_type} ` +
-                    `(${alert.source_ip} → ${alert.target_ip})`;
-                ul.appendChild(li);
-            });
-        });
+    const alerts = await fetch("/api/dashboard/alerts").then(r => r.json());
+    const alertsUl = document.getElementById("alerts");
+    alertsUl.innerHTML = "";
+    alerts.forEach(a => {
+        const li = document.createElement("li");
+        li.className = a.severity.toLowerCase();
+        li.textContent = `[${a.severity}] ${a.alert_type} (${a.source_ip} → ${a.target_ip})`;
+        alertsUl.appendChild(li);
+    });
 }
 
-// Rafraîchissement automatique
-setInterval(loadDashboard, 3000);
-loadDashboard();
+setInterval(refresh, 3000);
+refresh();
