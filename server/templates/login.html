@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Connexion - NetGuard Pro</title>
+    <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+
+<div class="login-box">
+    <h2>🔐 Accès Administrateur</h2>
+    <p id="message" class="info"></p>
+
+    <form method="post">
+        <input type="text" name="username" placeholder="Utilisateur" required>
+        <input type="password" name="password" placeholder="Mot de passe" required>
+        <button type="submit">Se connecter</button>
+    </form>
+</div>
+
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const msg = document.getElementById("message");
+
+    if (params.get("expired") === "1") {
+        msg.innerText = "Session expirée, veuillez vous reconnecter.";
+    }
+    if (params.get("error") === "1") {
+        msg.innerText = "Identifiants incorrects.";
+    }
+    if (params.get("error") === "csrf") {
+        msg.innerText = "Erreur CSRF détectée.";
+    }
+
+    fetch("/api/csrf-token")
+        .then(r => r.json())
+        .then(d => {
+            document.querySelector("form")
+                .insertAdjacentHTML(
+                    "beforeend",
+                    `<input type="hidden" name="csrf_token" value="${d.token}">`
+                );
+        });
+</script>
+
+</body>
+</html>
