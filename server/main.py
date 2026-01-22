@@ -1,59 +1,161 @@
-from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from server.services.collector import CollectorServer
-from server.auth import router as auth_router, require_login, SessionExpiredException
-from server.config import SESSION_SECRET_KEY
+from pydantic import BaseModel
+from datetime import datetime
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-app = FastAPI(title="NetGuard Pro — Central Server")
+# ===== Routers existants (Étudiant A) =====
+from traffic import router as traffic_router
+from alerts import router as alerts_router
+from receiver import router as receiver_router
+from dashboard import router as dashboard_router
 
-# ================= SESSION MIDDLEWARE =================
+# ===== Modèles BD (Étudiant A) =====
+from models import Agent, TrafficData, Alert, Statistics, Base
+
+# ===== Sécurité / Authentification (Étudiant C) =====
+# ⬇️ Nécessaire pour login, session, expiration
+from auth import router as auth_router, require_login, SessionExpired
+from config import SESSION_SECRET_KEY
+
+import uuid
+
+# ==================================================
+# Initialisation de FastAPI
+# ==================================================
+app = FastAPI(title="NetGuard Pro - Central Server")
+
+# ==================================================
+# Middleware de session (AJOUT ÉTUDIANT C)
+# 👉 OBLIGATOIRE pour que l’authentification fonctionne
+# ==================================================
 app.add_middleware(
     SessionMiddleware,
-    secret_key=SESSION_SECRET_KEY,
-    https_only=False
+    secret_key=SESSION_SECRET_KEY,  # clé secrète des sessions
+    same_site="lax",
+    https_only=False  # True en production HTTPS
 )
 
-# ================= EXCEPTION HANDLER =================
-@app.exception_handler(SessionExpiredException)
-async def session_expired_handler(request: Request, exc: SessionExpiredException):
+# ==================================================
+# Configuration de la base de données (Étudiant A)
+# ==================================================
+DATABASE_URL = 'sqlite:///netguard.db'
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    pool_pre_ping=True
+)
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
+
+# ==================================================
+# Création automatique des tables
+# 👉 indispensable pour un déploiement propre
+# ==================================================
+Base.metadata.create_all(bind=engine)
+
+# ==================================================
+# Fichiers statiques du dashboard (AJOUT ÉTUDIANT C)
+# ==================================================
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# ==================================================
+# Gestion globale de l’expiration de session (Étudiant C)
+# 👉 redirection vers /login au lieu de 401
+# ==================================================
+@app.exception_handler(SessionExpired)
+def session_expired_handler(request: Request, exc):
     return RedirectResponse("/login?expired=1", status_code=302)
 
-# ================= SERVICES =================
-collector = CollectorServer()
-
-# ================= STATIC =================
-app.mount("/static", StaticFiles(directory="server/static"), name="static")
-
-# ================= AUTH =================
+# ==================================================
+# Authentification (Étudiant C)
+# ==================================================
 app.include_router(auth_router)
 
-# ================= DASHBOARD =================
+# ==================================================
+# Page Dashboard sécurisée (Étudiant C)
+# ==================================================
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request):
-    require_login(request)
-    with open("server/templates/dashboard.html", encoding="utf-8") as f:
+def dashboard_page(request: Request):
+    require_login(request)  # protection par session
+    with open("templates/dashboard.html", encoding="utf-8") as f:
         return f.read()
 
-@app.get("/api/dashboard/overview")
-def overview(request: Request):
-    require_login(request)
-    return {
-        "agents": len(collector.agents),
-        "alerts": len(collector.recent_alerts)
-    }
+# ==================================================
+# Routers API (Étudiant A)
+# ==================================================
+app.include_router(traffic_router)
+app.include_router(alerts_router, prefix="/api/alerts", tags=["Alertes"])
+app.include_router(receiver_router)
 
-@app.get("/api/dashboard/agents")
-def agents(request: Request):
-    require_login(request)
-    return [
-        {"agent_id": aid, "status": data["status"]}
-        for aid, data in collector.agents.items()
-    ]
+# Dashboard API (consommée par le front)
+app.include_router(dashboard_router, tags=["Dashboard"])
 
-@app.get("/api/dashboard/alerts")
-def alerts(request: Request):
-    require_login(request)
-    return collector.recent_alerts[-10:]
+# ==================================================
+# ===== Gestion des AGENTS (Étudiant A)
+# ==================================================
+
+# Schéma Pydantic
+class AgentRegisterRequest(BaseModel):
+    hostname: str
+    ip_address: str
+
+# Endpoint 1: Enregistrer un agent
+@app.post("/api/agents/register")
+def register_agent(data: AgentRegisterRequest):
+    db = SessionLocal()
+    try:
+        agent = Agent(
+            agent_id=str(uuid.uuid4()),
+            hostname=data.hostname,
+            ip_address=data.ip_address,
+            status="active",
+            created_at=datetime.now(),
+            last_heartbeat=datetime.now()
+        )
+        db.add(agent)
+        db.commit()
+        db.refresh(agent)
+        return {
+            "message": "Agent enregistré avec succès",
+            "agent_id": agent.agent_id
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+# Endpoint 2: Lister tous les agents
+@app.get("/api/agents")
+def list_agents():
+    db = SessionLocal()
+    try:
+        return db.query(Agent).all()
+    finally:
+        db.close()
+
+# Endpoint 3: Statut d’un agent
+@app.get("/api/agents/{agent_id}/status")
+def get_agent_status(agent_id: str):
+    db = SessionLocal()
+    try:
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent non trouvé")
+        return {
+            "agent_id": agent.agent_id,
+            "status": agent.status,
+            "last_heartbeat": agent.last_heartbeat
+        }
+    finally:
+        db.close()
