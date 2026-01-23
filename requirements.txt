@@ -1,9 +1,9 @@
+passlib
 fastapi
 uvicorn
 sqlalchemy
-requests
-python-dotenv
-passlib[bcrypt]
-python-multipart
 passlib
-CryptContext
+python-multipart
+itsdangerous
+starlette
+jinja2
