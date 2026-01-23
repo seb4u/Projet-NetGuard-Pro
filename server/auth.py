@@ -12,19 +12,17 @@ from server.config import (
 
 router = APIRouter()
 
-# ================= EXCEPTION =================
 class SessionExpiredException(Exception):
     pass
 
-# ================= UTILS =================
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
-def require_login(request: Request):
+def require_login(request: Request) -> bool:
     session = request.session
 
     if "user" not in session or "last_activity" not in session:
-        raise SessionExpiredException()
+        return False
 
     last_activity = datetime.fromisoformat(session["last_activity"])
     now = datetime.utcnow()
@@ -34,12 +32,23 @@ def require_login(request: Request):
         raise SessionExpiredException()
 
     session["last_activity"] = now.isoformat()
+    return True
 
-# ================= ROUTES =================
 @router.get("/login", response_class=HTMLResponse)
-def login_page():
+def login_page(request: Request):
     with open("server/templates/login.html", encoding="utf-8") as f:
-        return f.read()
+        html = f.read()
+
+    msg = ""
+    p = request.query_params
+    if p.get("expired") == "1":
+        msg = "Session expirée, veuillez vous reconnecter."
+    elif p.get("error") == "1":
+        msg = "Identifiants incorrects."
+    elif p.get("error") == "csrf":
+        msg = "Erreur CSRF détectée."
+
+    return html.replace("{{MESSAGE}}", msg)
 
 @router.get("/api/csrf-token")
 def csrf_token(request: Request):
@@ -57,15 +66,11 @@ def login(
     if csrf_token != request.session.get("csrf_token"):
         return RedirectResponse("/login?error=csrf", status_code=302)
 
-    if username != ADMIN_USERNAME:
-        return RedirectResponse("/login?error=1", status_code=302)
-
-    if not verify_password(password, ADMIN_PASSWORD_HASH):
+    if username != ADMIN_USERNAME or not verify_password(password, ADMIN_PASSWORD_HASH):
         return RedirectResponse("/login?error=1", status_code=302)
 
     request.session["user"] = username
     request.session["last_activity"] = datetime.utcnow().isoformat()
-
     return RedirectResponse("/dashboard", status_code=302)
 
 @router.get("/logout")
