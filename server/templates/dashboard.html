@@ -2,31 +2,109 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>NetGuard Pro — Dashboard</title>
+    <title>NetGuard Pro — SOC Dashboard</title>
+
     <link rel="stylesheet" href="/static/css/dashboard.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-<header>
-    <h1>🛡 NetGuard Pro</h1>
-    <p>Supervision IDS</p>
+<header class="top-bar">
+    <h1>🛡 NetGuard Pro — SOC Dashboard</h1>
+
+    <a class="logout-btn" href="/logout" title="Déconnexion">
+        <svg viewBox="0 0 24 24" class="icon">
+            <path d="M12 2v10"/>
+            <path d="M6.4 4.4a9 9 0 1 0 11.2 0"/>
+        </svg>
+        Déconnexion
+    </a>
 </header>
 
-<main>
-    <section class="card">
-        <h2>Vue d’ensemble</h2>
-        <div id="overview">Chargement...</div>
+<main class="container">
+
+    <!-- ================= KPI ================= -->
+    <section class="kpi-grid">
+        <div class="kpi">
+            <svg viewBox="0 0 24 24" class="kpi-icon">
+                <path d="M12 2l8 4v6c0 5-3.4 9.7-8 10-4.6-.3-8-5-8-10V6z"/>
+            </svg>
+            <span id="kpi-agents">0</span>
+            <small>Agents actifs</small>
+        </div>
+
+        <div class="kpi">
+            <svg viewBox="0 0 24 24" class="kpi-icon alert">
+                <path d="M12 9v4"/>
+                <path d="M12 17h.01"/>
+                <path d="M10.3 3.7L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0z"/>
+            </svg>
+            <span id="kpi-alerts">0</span>
+            <small>Alertes totales</small>
+        </div>
     </section>
 
-    <section class="card">
-        <h2>Agents</h2>
-        <ul id="agents"></ul>
+    <!-- ================= GRAPHS HAUT ================= -->
+    <section class="graphs-grid">
+
+        <div class="card">
+            <h2>
+                <svg viewBox="0 0 24 24" class="title-icon">
+                    <rect x="3" y="3" width="18" height="6"/>
+                    <rect x="3" y="9" width="18" height="6"/>
+                    <rect x="3" y="15" width="18" height="6"/>
+                </svg>
+                Agents actifs
+            </h2>
+            <canvas id="agentsChart"></canvas>
+        </div>
+
+        <div class="card">
+            <h2>
+                <svg viewBox="0 0 24 24" class="title-icon alert">
+                    <path d="M12 9v4"/>
+                    <path d="M12 17h.01"/>
+                    <path d="M10.3 3.7L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0z"/>
+                </svg>
+                Alertes par sévérité
+            </h2>
+
+            <canvas id="severityChart"></canvas>
+
+            <!-- LÉGENDE SOC -->
+            <div class="severity-legend">
+                <span class="sev low">LOW</span>
+                <span class="sev medium">MEDIUM</span>
+                <span class="sev high">HIGH</span>
+                <span class="sev critical">CRITICAL</span>
+            </div>
+        </div>
+
     </section>
 
-    <section class="card">
-        <h2>Alertes</h2>
-        <ul id="alerts"></ul>
+    <!-- ================= GRAPHS BAS ================= -->
+    <section class="graphs-grid">
+
+        <div class="card">
+            <h2>
+                <svg viewBox="0 0 24 24" class="title-icon">
+                    <line x1="4" y1="19" x2="20" y2="19"/>
+                    <polyline points="4,15 9,10 13,13 20,6"/>
+                </svg>
+                Alertes dans le temps
+            </h2>
+            <canvas id="alertsTimeline"></canvas>
+        </div>
+
+        <div class="card">
+            <h2>Alertes récentes</h2>
+            <ul id="alerts"></ul>
+        </div>
+
     </section>
+
 </main>
 
 <script src="/static/js/dashboard.js"></script>
