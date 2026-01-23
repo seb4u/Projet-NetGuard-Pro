@@ -5,8 +5,13 @@ from datetime import timedelta
 ADMIN_USERNAME = "admin"
 
 # Mot de passe réel : netguard2026
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-ADMIN_PASSWORD_HASH = pwd_context.hash("netguard2026")
+# Hash bcrypt valide
+ADMIN_PASSWORD_HASH = "$2b$12$aIZ98olaWCn5.leW1UkF0uprpkO1NqOb90n047A9g9uxE5s5fXj9K"
+
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto"
+)
 
 # ================= SESSION =================
 SESSION_SECRET_KEY = "CHANGE_ME_SUPER_SECRET_KEY_2026"
