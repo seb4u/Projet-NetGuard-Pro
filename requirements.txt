@@ -1,7 +1,9 @@
 fastapi
 uvicorn
 sqlalchemy
-pydantic
-scapy
-jinja2
+requests
+python-dotenv
+passlib[bcrypt]
 python-multipart
+passlib
+CryptContext
