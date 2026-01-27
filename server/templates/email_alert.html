@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Alerte de Sécurité NetGuard Pro</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .content {
+            padding: 30px;
+        }
+        .alert-box {
+            background: #fee2e2;
+            border-left: 4px solid #dc2626;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .label {
+            font-weight: 600;
+            color: #374151;
+        }
+        .value {
+            font-family: monospace;
+            color: #6b7280;
+        }
+        .footer {
+            background: #f9fafb;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ NetGuard Pro</h1>
+            <p>Alerte de Sécurité Détectée</p>
+        </div>
+        <div class="content">
+            <div class="alert-box">
+                <h3 style="margin-top: 0; color: #dc2626;">
+                    {{ alert_type }} - Niveau {{ severity }}
+                </h3>
+                <p>Une menace a été détectée sur votre réseau.</p>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Type d'attaque:</span>
+                <span class="value">{{ alert_type }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Source IP:</span>
+                <span class="value">{{ source_ip }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Cible:</span>
+                <span class="value">{{ target_ip }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Agent détecteur:</span>
+                <span class="value">{{ agent_id }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Date/Heure:</span>
+                <span class="value">{{ timestamp }}</span>
+            </div>
+            <div class="detail-row" style="border-bottom: none;">
+                <span class="label">Détails techniques:</span>
+            </div>
+            <p style="background: #f3f4f6; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 0.9em;">
+                {{ details }}
+            </p>
+        </div>
+        <div class="footer">
+            <p>NetGuard Pro - UVCI Master Cybersécurité & IoT</p>
+            <p>Cet email a été généré automatiquement par le système de détection d'intrusions.</p>
+        </div>
+    </div>
+</body>
+</html>
