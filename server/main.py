@@ -1,118 +1,119 @@
-from fastapi import FastAPI, Request, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+NetGuard Pro - Serveur FastAPI
+Version 2.6.0 avec gestion d'événements lifespan
+"""
+
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from pathlib import Path
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime
+import threading
+from contextlib import asynccontextmanager
 
-from server.models import Alert, Statistics, Base
-from auth import router as auth_router, require_login, SessionExpiredException
-from server.config import SESSION_SECRET_KEY
+# Database et Routing
+from server.database import engine, Base
+from server.routers import agents, alerts, auth, dashboard
+from server.services.collector import get_collector
 
-# ==================================================
-# Base directory
-# ==================================================
-BASE_DIR = Path(__file__).resolve().parent
-DATABASE_PATH = BASE_DIR / "netguard.db"
 
-# ==================================================
-# App
-# ==================================================
-app = FastAPI(title="NetGuard Pro - Dashboard")
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFESPAN MANAGER (Remplace les deprecated @app.on_event)
+# ─────────────────────────────────────────────────────────────────────────────
 
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=SESSION_SECRET_KEY,
-    same_site="lax"
-)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Gestion du cycle de vie de l'application (startup/shutdown)"""
+    # [STARTUP] Démarrage du collecteur TCP
+    collector = get_collector()
+    thread = threading.Thread(target=collector.start, daemon=True)
+    thread.start()
+    print("✅ Serveur de collecte démarré sur le port 9999")
 
-# ==================================================
-# Database
-# ==================================================
-engine = create_engine(
-    f"sqlite:///{DATABASE_PATH}",
-    connect_args={"check_same_thread": False}
-)
+    yield  # Application en cours d'exécution
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # [SHUTDOWN] Arrêt propre du collecteur
+    collector.stop()
+    print("🛑 Serveur de collecte arrêté")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIGURATION FASTAPI
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Création des tables SQLAlchemy
 Base.metadata.create_all(bind=engine)
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# ==================================================
-# Static files
-# ==================================================
-app.mount(
-    "/static",
-    StaticFiles(directory=BASE_DIR / "static"),
-    name="static"
+app = FastAPI(
+    title="NetGuard Pro",
+    description="Plateforme Distribuée de Supervision et Détection d'Intrusions",
+    version="2.6.0",
+    lifespan=lifespan  # Nouveau système d'événements
 )
 
-# ==================================================
-# Auth
-# ==================================================
-app.include_router(auth_router)
+# CORS - Configuration des origines autorisées
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # À restreindre en production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ==================================================
-# Pages
-# ==================================================
-@app.get("/", include_in_schema=False)
-def root():
-    return RedirectResponse("/dashboard")
+# Static files et Templates
+app.mount("/static", StaticFiles(directory="server/static"), name="static")
+templates = Jinja2Templates(directory="server/templates")
+
+# Inclusion des routers API
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ROUTES WEB
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    """Redirection vers la page de login"""
+    return RedirectResponse(url="/login")
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    """Page de connexion SOC"""
+    return templates.TemplateResponse("login.html", {"request": request})
+
 
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request):
-    try:
-        if not require_login(request):
-            return RedirectResponse("/login")
-    except SessionExpiredException:
-        return RedirectResponse("/login?expired=1")
+async def dashboard_page():
+    """Page principale du dashboard SOC"""
+    # Le paramètre request n'est pas utilisé directement mais est requis par Jinja2
+    return templates.TemplateResponse("dashboard.html", {"request": {"url": "http://localhost:8000/dashboard"}})
 
-    with open(BASE_DIR / "templates" / "dashboard.html", encoding="utf-8") as f:
-        return f.read()
 
-# ==================================================
-# API - Dashboard
-# ==================================================
-@app.get("/api/dashboard/overview")
-def dashboard_overview(db: Session = Depends(get_db)):
-    stat = db.query(Statistics).order_by(Statistics.timestamp.desc()).first()
+@app.get("/api/health")
+async def health_check():
+    """Endpoint de health check pour monitoring"""
+    collector = get_collector()
     return {
-        "agents": stat.active_agents if stat else 0,
-        "alerts": stat.total_alerts if stat else 0
+        "status": "healthy",
+        "collector_active": collector.running if collector else False,
+        "database": "connected",
+        "timestamp": datetime.now().isoformat()
     }
 
-@app.get("/api/dashboard/agents")
-def dashboard_agents(db: Session = Depends(get_db)):
-    return []
 
-@app.get("/api/dashboard/alerts")
-def dashboard_alerts(db: Session = Depends(get_db)):
-    alerts = db.query(Alert).order_by(Alert.timestamp.desc()).limit(50).all()
-    return [
-        {
-            "id": a.id,
-            "alert_type": a.alert_type,
-            "severity": a.severity,
-            "source_ip": a.source_ip,
-            "target_ip": a.target_ip,
-            "timestamp": a.timestamp.isoformat()
-        }
-        for a in alerts
-    ]
+# ─────────────────────────────────────────────────────────────────────────────
+# LANCEMENT DIRECT (pour développement)
+# ─────────────────────────────────────────────────────────────────────────────
 
-@app.get("/api/dashboard/metrics")
-def dashboard_metrics(db: Session = Depends(get_db)):
-    stat = db.query(Statistics).order_by(Statistics.timestamp.desc()).first()
-    return {
-        "active_agents": stat.active_agents if stat else 0,
-        "total_alerts": stat.total_alerts if stat else 0,
-        "total_packets": stat.total_packets if stat else 0,
-        "avg_packets_per_second": stat.avg_packets_per_second if stat else 0
-    }
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
