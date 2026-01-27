@@ -1,112 +1,721 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>NetGuard Pro — SOC Dashboard</title>
+{% extends "base.html" %}
 
-    <link rel="stylesheet" href="/static/css/dashboard.css">
+{% block title %}Dashboard SOC - NetGuard Pro{% endblock %}
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
+{% block extra_css %}
+<style>
+    /* Background SOC animé */
+    .soc-dashboard-bg {
+        background:
+            radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+            linear-gradient(180deg, #0a0f1c 0%, #0f172a 100%);
+        position: relative;
+        min-height: 100vh;
+    }
 
-<header class="top-bar">
-    <h1>🛡 NetGuard Pro — SOC Dashboard</h1>
+    /* Grille tactique animée */
+    .soc-dashboard-bg::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image:
+            linear-gradient(rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        z-index: 0;
+    }
 
-    <a class="logout-btn" href="/logout" title="Déconnexion">
-        <svg viewBox="0 0 24 24" class="icon">
-            <path d="M12 2v10"/>
-            <path d="M6.4 4.4a9 9 0 1 0 11.2 0"/>
-        </svg>
-        Déconnexion
-    </a>
-</header>
+    /* Navigation style HUD */
+    .soc-nav {
+        background: rgba(15, 23, 42, 0.9);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(6, 182, 212, 0.3);
+        box-shadow: 0 0 20px rgba(6, 182, 212, 0.1);
+    }
 
-<main class="container">
+    .soc-nav::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #06b6d4, transparent);
+        animation: scanline-h 4s linear infinite;
+    }
 
-    <!-- ================= KPI ================= -->
-    <section class="kpi-grid">
-        <div class="kpi">
-            <svg viewBox="0 0 24 24" class="kpi-icon">
-                <path d="M12 2l8 4v6c0 5-3.4 9.7-8 10-4.6-.3-8-5-8-10V6z"/>
-            </svg>
-            <span id="kpi-agents">0</span>
-            <small>Agents actifs</small>
+    @keyframes scanline-h {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+
+    /* Cartes métriques style terminal */
+    .soc-metric-card {
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(6, 182, 212, 0.2);
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .soc-metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, currentColor, transparent);
+        opacity: 0.5;
+    }
+
+    .soc-metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Couleurs spécifiques par carte */
+    .metric-agents { color: #06b6d4; border-color: rgba(6, 182, 212, 0.3); }
+    .metric-alerts { color: #eab308; border-color: rgba(234, 179, 8, 0.3); }
+    .metric-traffic { color: #10b981; border-color: rgba(16, 185, 129, 0.3); }
+    .metric-critical { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
+
+    /* Icônes pulsantes */
+    .soc-icon-pulse {
+        animation: iconPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes iconPulse {
+        0%, 100% { opacity: 0.8; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.1); filter: drop-shadow(0 0 8px currentColor); }
+    }
+
+    /* Valeurs numériques style digital */
+    .soc-value {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        letter-spacing: -1px;
+        text-shadow: 0 0 10px currentColor;
+    }
+
+    /* Conteneurs de graphiques */
+    .soc-chart-container {
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(6, 182, 212, 0.2);
+        box-shadow:
+            0 0 0 1px rgba(6, 182, 212, 0.1),
+            inset 0 0 20px rgba(6, 182, 212, 0.05);
+        position: relative;
+    }
+
+    .soc-chart-container::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 20px;
+        height: 20px;
+        border-right: 2px solid rgba(6, 182, 212, 0.5);
+        border-bottom: 2px solid rgba(6, 182, 212, 0.5);
+    }
+
+    .soc-chart-title {
+        font-family: 'Courier New', monospace;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-size: 0.85rem;
+        color: #06b6d4;
+        border-left: 3px solid #06b6d4;
+        padding-left: 10px;
+    }
+
+    /* Tableau style console */
+    .soc-table-container {
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(6, 182, 212, 0.2);
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .soc-table-header {
+        background: rgba(6, 182, 212, 0.1);
+        border-bottom: 2px solid rgba(6, 182, 212, 0.3);
+        font-family: 'Courier New', monospace;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.75rem;
+        color: #06b6d4;
+    }
+
+    .soc-table-row {
+        border-bottom: 1px solid rgba(6, 182, 212, 0.1);
+        transition: all 0.2s;
+    }
+
+    .soc-table-row:hover {
+        background: rgba(6, 182, 212, 0.05);
+        box-shadow: inset 0 0 10px rgba(6, 182, 212, 0.1);
+    }
+
+    /* Badges de sévérité améliorés */
+    .badge-soc {
+        font-family: 'Courier New', monospace;
+        font-size: 0.7rem;
+        font-weight: bold;
+        padding: 4px 8px;
+        border-radius: 4px;
+        letter-spacing: 1px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .badge-soc::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        animation: badgeShine 3s infinite;
+    }
+
+    @keyframes badgeShine {
+        0% { left: -100%; }
+        20% { left: 100%; }
+        100% { left: 100%; }
+    }
+
+    .badge-critical {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    }
+    .badge-high {
+        background: rgba(249, 115, 22, 0.2);
+        color: #f97316;
+        border: 1px solid rgba(249, 115, 22, 0.5);
+    }
+    .badge-medium {
+        background: rgba(234, 179, 8, 0.2);
+        color: #eab308;
+        border: 1px solid rgba(234, 179, 8, 0.5);
+    }
+    .badge-low {
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+        border: 1px solid rgba(59, 130, 246, 0.5);
+    }
+
+    /* Boutons style contrôle */
+    .soc-btn {
+        font-family: 'Courier New', monospace;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.75rem;
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .soc-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .soc-btn:hover::before {
+        left: 100%;
+    }
+
+    .soc-btn-danger {
+        background: linear-gradient(135deg, rgba(220, 38, 38, 0.8), rgba(153, 27, 27, 0.8));
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        color: white;
+    }
+
+    .soc-btn-danger:hover {
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+    }
+
+    /* Bouton Export PDF */
+    .soc-btn-export {
+        background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
+        border: 1px solid rgba(6, 182, 212, 0.5);
+        color: #06b6d4;
+    }
+
+    .soc-btn-export:hover {
+        background: rgba(6, 182, 212, 0.3);
+        box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+        color: #fff;
+    }
+
+    /* Indicateur de statut en ligne */
+    .status-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        animation: statusPulse 2s infinite;
+    }
+
+    .status-online { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .status-warning { background: #eab308; box-shadow: 0 0 8px #eab308; }
+    .status-offline { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+
+    @keyframes statusPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    /* Scrollbar stylisée */
+    .soc-scroll::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    .soc-scroll::-webkit-scrollbar-track {
+        background: rgba(6, 182, 212, 0.05);
+    }
+    .soc-scroll::-webkit-scrollbar-thumb {
+        background: rgba(6, 182, 212, 0.3);
+        border-radius: 4px;
+    }
+    .soc-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(6, 182, 212, 0.5);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="soc-dashboard-bg pb-8">
+    <!-- Navigation HUD -->
+    <nav class="soc-nav sticky top-0 z-50 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <i class="fas fa-shield-virus text-2xl text-cyan-400 soc-icon-pulse"></i>
+                        <div class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+                    </div>
+                    <div>
+                        <span class="text-white font-bold text-xl tracking-wider font-mono">NETGUARD<span class="text-cyan-400">_PRO</span></span>
+                        <div class="text-xs text-cyan-600 font-mono tracking-widest">SOC DASHBOARD v2.6</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <div class="hidden md:flex items-center space-x-2 text-xs font-mono text-cyan-600 bg-cyan-900/20 px-3 py-1 rounded border border-cyan-800">
+                        <span class="status-indicator status-online"></span>
+                        <span>SYSTEM ONLINE</span>
+                    </div>
+                    <button onclick="logout()" class="soc-btn soc-btn-danger px-4 py-2 rounded flex items-center space-x-2">
+                        <i class="fas fa-power-off"></i>
+                        <span class="hidden sm:inline">Déconnexion</span>
+                    </button>
+                </div>
+            </div>
         </div>
+    </nav>
 
-        <div class="kpi">
-            <svg viewBox="0 0 24 24" class="kpi-icon alert">
-                <path d="M12 9v4"/>
-                <path d="M12 17h.01"/>
-                <path d="M10.3 3.7L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0z"/>
-            </svg>
-            <span id="kpi-alerts">0</span>
-            <small>Alertes totales</small>
-        </div>
-    </section>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+        <!-- Stats Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Agents -->
+            <div class="soc-metric-card metric-agents rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-mono uppercase tracking-wider opacity-70 mb-1">Agents Actifs</p>
+                        <p class="text-4xl soc-value" id="activeAgents">0</p>
+                        <p class="text-xs mt-1 opacity-60 font-mono" id="totalAgentsInfo">sur 0 total</p>
+                    </div>
+                    <div class="text-3xl opacity-80">
+                        <i class="fas fa-server soc-icon-pulse"></i>
+                    </div>
+                </div>
+                <div class="mt-3 h-1 w-full bg-gray-800 rounded overflow-hidden">
+                    <div id="agentsBar" class="h-full bg-cyan-400 transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
 
-    <!-- ================= GRAPHS HAUT ================= -->
-    <section class="graphs-grid">
+            <!-- Alertes -->
+            <div class="soc-metric-card metric-alerts rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-mono uppercase tracking-wider opacity-70 mb-1">Alertes 24h</p>
+                        <p class="text-4xl soc-value" id="alerts24h">0</p>
+                        <p class="text-xs mt-1 opacity-60 font-mono" id="unresolvedInfo">0 non résolues</p>
+                    </div>
+                    <div class="text-3xl opacity-80">
+                        <i class="fas fa-exclamation-triangle soc-icon-pulse"></i>
+                    </div>
+                </div>
+                <div class="mt-3 h-1 w-full bg-gray-800 rounded overflow-hidden">
+                    <div id="alertsBar" class="h-full bg-yellow-400 transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
 
-        <div class="card">
-            <h2>
-                <svg viewBox="0 0 24 24" class="title-icon">
-                    <rect x="3" y="3" width="18" height="6"/>
-                    <rect x="3" y="9" width="18" height="6"/>
-                    <rect x="3" y="15" width="18" height="6"/>
-                </svg>
-                Agents actifs
-            </h2>
-            <canvas id="agentsChart"></canvas>
-        </div>
+            <!-- Trafic -->
+            <div class="soc-metric-card metric-traffic rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-mono uppercase tracking-wider opacity-70 mb-1">Paquets/sec</p>
+                        <p class="text-4xl soc-value" id="packetsPerSecond">0</p>
+                        <p class="text-xs mt-1 opacity-60 font-mono">Débit temps réel</p>
+                    </div>
+                    <div class="text-3xl opacity-80">
+                        <i class="fas fa-network-wired soc-icon-pulse"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex space-x-1">
+                    <div class="h-1 w-1 bg-green-500 rounded-full animate-pulse"></div>
+                    <div class="h-1 w-1 bg-green-500 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+                    <div class="h-1 w-1 bg-green-500 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
+                </div>
+            </div>
 
-        <div class="card">
-            <h2>
-                <svg viewBox="0 0 24 24" class="title-icon alert">
-                    <path d="M12 9v4"/>
-                    <path d="M12 17h.01"/>
-                    <path d="M10.3 3.7L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0z"/>
-                </svg>
-                Alertes par sévérité
-            </h2>
-
-            <canvas id="severityChart"></canvas>
-
-            <!-- LÉGENDE SOC -->
-            <div class="severity-legend">
-                <span class="sev low">LOW</span>
-                <span class="sev medium">MEDIUM</span>
-                <span class="sev high">HIGH</span>
-                <span class="sev critical">CRITICAL</span>
+            <!-- Critiques -->
+            <div class="soc-metric-card metric-critical rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-mono uppercase tracking-wider opacity-70 mb-1">Alertes Critiques</p>
+                        <p class="text-4xl soc-value text-red-500" id="criticalAlerts">0</p>
+                        <p class="text-xs mt-1 text-red-400 font-mono animate-pulse">ACTION REQUISE</p>
+                    </div>
+                    <div class="text-3xl text-red-500 opacity-80">
+                        <i class="fas fa-radiation soc-icon-pulse"></i>
+                    </div>
+                </div>
+                <div class="mt-3 h-1 w-full bg-gray-800 rounded overflow-hidden">
+                    <div id="criticalBar" class="h-full bg-red-500 transition-all duration-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]" style="width: 0%"></div>
+                </div>
             </div>
         </div>
 
-    </section>
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Trafic Chart -->
+            <div class="soc-chart-container rounded-xl p-6 h-96 flex flex-col">
+                <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                    <h3 class="soc-chart-title flex items-center">
+                        <i class="fas fa-chart-line mr-2"></i>
+                        Trafic Réseau Temps Réel
+                    </h3>
+                    <div class="flex items-center space-x-2">
+                        <span class="status-indicator status-online"></span>
+                        <span class="text-xs font-mono text-cyan-600">LIVE</span>
+                    </div>
+                </div>
+                <div class="flex-1 relative min-h-0">
+                    <canvas id="trafficChart"></canvas>
+                </div>
+            </div>
 
-    <!-- ================= GRAPHS BAS ================= -->
-    <section class="graphs-grid">
-
-        <div class="card">
-            <h2>
-                <svg viewBox="0 0 24 24" class="title-icon">
-                    <line x1="4" y1="19" x2="20" y2="19"/>
-                    <polyline points="4,15 9,10 13,13 20,6"/>
-                </svg>
-                Alertes dans le temps
-            </h2>
-            <canvas id="alertsTimeline"></canvas>
+            <!-- Alert Distribution -->
+            <div class="soc-chart-container rounded-xl p-6 h-96 flex flex-col">
+                <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                    <h3 class="soc-chart-title flex items-center">
+                        <i class="fas fa-chart-pie mr-2"></i>
+                        Distribution des Menaces
+                    </h3>
+                    <button onclick="loadDashboard()" class="text-cyan-400 hover:text-cyan-300 text-xs font-mono transition-colors">
+                        <i class="fas fa-sync-alt mr-1"></i>REFRESH
+                    </button>
+                </div>
+                <div class="flex-1 relative min-h-0 flex items-center justify-center">
+                    <canvas id="alertChart"></canvas>
+                </div>
+            </div>
         </div>
 
-        <div class="card">
-            <h2>Alertes récentes</h2>
-            <ul id="alerts"></ul>
+        <!-- Recent Alerts Table -->
+        <div class="soc-table-container rounded-xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-cyan-900/30 flex justify-between items-center bg-cyan-900/10">
+                <h3 class="soc-chart-title flex items-center border-l-red-500 text-red-400 m-0">
+                    <i class="fas fa-list-alt mr-2"></i>
+                    Journal d'Alertes Sécurité
+                </h3>
+                <div class="flex items-center space-x-3">
+                    <!-- BOUTON EXPORT PDF -->
+                    <button onclick="exportReport()" class="soc-btn soc-btn-export px-4 py-2 rounded flex items-center space-x-2">
+                        <i class="fas fa-file-pdf"></i>
+                        <span class="hidden sm:inline">Exporter Rapport</span>
+                    </button>
+                    <div class="flex items-center space-x-4 text-xs font-mono text-cyan-600">
+                        <span><i class="fas fa-circle text-red-500 mr-1"></i>CRITIQUE</span>
+                        <span><i class="fas fa-circle text-yellow-500 mr-1"></i>HAUT</span>
+                        <span><i class="fas fa-circle text-blue-500 mr-1"></i>FAIBLE</span>
+                    </div>
+                </div>
+            </div>
+            <div class="overflow-x-auto max-h-96 overflow-y-auto soc-scroll">
+                <table class="w-full text-left text-sm">
+                    <thead class="soc-table-header sticky top-0">
+                        <tr>
+                            <th class="px-6 py-3 font-mono">TYPE</th>
+                            <th class="px-6 py-3 font-mono">SEV</th>
+                            <th class="px-6 py-3 font-mono">SOURCE IP</th>
+                            <th class="px-6 py-3 font-mono">TIMESTAMP</th>
+                            <th class="px-6 py-3 font-mono">STATUT</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alertsTableBody" class="divide-y divide-cyan-900/20 text-gray-300 font-mono text-xs">
+                        <!-- Dynamic content -->
+                    </tbody>
+                </table>
+            </div>
         </div>
+    </main>
+</div>
 
-    </section>
+<script>
+let trafficChart = null;
+let alertChart = null;
+const maxDataPoints = 20;
 
-</main>
+function initCharts() {
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                labels: {
+                    color: '#06b6d4',
+                    font: { family: 'Courier New', size: 11 },
+                    usePointStyle: true
+                }
+            }
+        }
+    };
 
-<script src="/static/js/dashboard.js"></script>
-</body>
-</html>
+    // Traffic Chart - Style ligne néon
+    const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+    trafficChart = new Chart(trafficCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'PAQUETS/SEC',
+                data: [],
+                borderColor: '#06b6d4',
+                backgroundColor: (context) => {
+                    const ctx = context.chart.ctx;
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+                    gradient.addColorStop(0, 'rgba(6, 182, 212, 0.3)');
+                    gradient.addColorStop(1, 'rgba(6, 182, 212, 0)');
+                    return gradient;
+                },
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2,
+                pointBackgroundColor: '#06b6d4',
+                pointBorderColor: '#fff',
+                pointRadius: 3,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            ...commonOptions,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(6, 182, 212, 0.1)' },
+                    ticks: {
+                        color: '#06b6d4',
+                        font: { family: 'Courier New' }
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        color: '#06b6d4',
+                        font: { family: 'Courier New', size: 10 },
+                        maxTicksLimit: 8
+                    }
+                }
+            },
+            animation: { duration: 0 }
+        }
+    });
+
+    // Alert Chart - Style doughnut cyberpunk
+    const alertCtx = document.getElementById('alertChart').getContext('2d');
+    alertChart = new Chart(alertCtx, {
+        type: 'doughnut',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [
+                    '#ef4444', // Critical
+                    '#f97316', // High
+                    '#eab308', // Medium
+                    '#3b82f6', // Low
+                    '#10b981'  // Info
+                ],
+                borderWidth: 0,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            ...commonOptions,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        color: '#06b6d4',
+                        font: { family: 'Courier New', size: 11 },
+                        padding: 15
+                    }
+                }
+            }
+        }
+    });
+}
+
+async function loadDashboard() {
+    try {
+        const response = await fetchWithAuth('/api/dashboard/metrics');
+        const data = await response.json();
+
+        // Mise à jour des cartes avec animation
+        document.getElementById('activeAgents').textContent = data.active_agents;
+        document.getElementById('alerts24h').textContent = data.alerts_24h;
+        document.getElementById('packetsPerSecond').textContent = Math.round(data.packets_per_second || 0);
+        document.getElementById('criticalAlerts').textContent = data.critical_alerts;
+
+        // Info supplémentaire
+        document.getElementById('totalAgentsInfo').textContent = `sur ${data.total_agents} total`;
+        document.getElementById('unresolvedInfo').textContent = `${data.unresolved_alerts} non résolues`;
+
+        // Barres de progression visuelles
+        const agentsPercent = data.total_agents > 0 ? (data.active_agents / data.total_agents * 100) : 0;
+        document.getElementById('agentsBar').style.width = `${agentsPercent}%`;
+
+        const alertsPercent = data.alerts_24h > 0 ? (data.unresolved_alerts / data.alerts_24h * 100) : 0;
+        document.getElementById('alertsBar').style.width = `${Math.min(alertsPercent, 100)}%`;
+
+        const criticalPercent = Math.min(data.critical_alerts * 10, 100);
+        document.getElementById('criticalBar').style.width = `${criticalPercent}%`;
+
+        // Mise à jour Trafic
+        if (trafficChart) {
+            const now = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            trafficChart.data.labels.push(now);
+            trafficChart.data.datasets[0].data.push(data.packets_per_second || 0);
+
+            if (trafficChart.data.labels.length > maxDataPoints) {
+                trafficChart.data.labels.shift();
+                trafficChart.data.datasets[0].data.shift();
+            }
+            trafficChart.update('none');
+        }
+
+        // Mise à jour Distribution
+        if (alertChart && data.alert_distribution) {
+            const newLabels = data.alert_distribution.map(d => d.type);
+            const newData = data.alert_distribution.map(d => d.count);
+
+            if (JSON.stringify(alertChart.data.labels) !== JSON.stringify(newLabels)) {
+                alertChart.data.labels = newLabels;
+                alertChart.data.datasets[0].data = newData;
+                alertChart.update();
+            }
+        }
+
+        // Charger alertes récentes avec style SOC
+        const alertsRes = await fetchWithAuth('/api/alerts/recent?limit=10');
+        const alerts = await alertsRes.json();
+
+        const tbody = document.getElementById('alertsTableBody');
+        tbody.innerHTML = alerts.map(alert => {
+            const severityClass = {
+                'CRITICAL': 'badge-critical',
+                'HIGH': 'badge-high',
+                'MEDIUM': 'badge-medium',
+                'LOW': 'badge-low'
+            }[alert.severity] || 'badge-low';
+
+            const statusIcon = alert.resolved ?
+                '<span class="text-green-400"><i class="fas fa-check-circle"></i> RÉSOLU</span>' :
+                alert.acknowledged ?
+                '<span class="text-yellow-400"><i class="fas fa-eye"></i> VU</span>' :
+                '<span class="text-red-400 animate-pulse"><i class="fas fa-exclamation-circle"></i> ACTIF</span>';
+
+            return `
+            <tr class="soc-table-row">
+                <td class="px-6 py-4 text-cyan-100 font-bold">${alert.alert_type}</td>
+                <td class="px-6 py-4"><span class="badge-soc ${severityClass}">${alert.severity}</span></td>
+                <td class="px-6 py-4 text-cyan-300 font-mono">${alert.source_ip}</td>
+                <td class="px-6 py-4 text-gray-400 text-xs">${new Date(alert.timestamp).toLocaleString('fr-FR')}</td>
+                <td class="px-6 py-4 text-xs font-bold">${statusIcon}</td>
+            </tr>
+        `}).join('');
+
+    } catch (e) {
+        console.error('Erreur chargement dashboard:', e);
+    }
+}
+
+// FONCTION EXPORT PDF
+async function exportReport() {
+    try {
+        const btn = document.querySelector('button[onclick="exportReport()"]');
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span class="hidden sm:inline">GENERATION...</span>';
+        btn.disabled = true;
+
+        const response = await fetchWithAuth('/api/dashboard/export-report');
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `rapport_securite_${new Date().toISOString().slice(0,10)}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            btn.innerHTML = '<i class="fas fa-check"></i> <span class="hidden sm:inline">EXPORTE</span>';
+            setTimeout(() => {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }, 2000);
+        } else {
+            throw new Error('Erreur generation PDF');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Erreur lors de l\'export du rapport. Verifiez que fpdf2 est installe (pip install fpdf2)');
+    }
+}
+
+function logout() {
+    localStorage.removeItem('access_token');
+    window.location.href = '/login';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initCharts();
+    loadDashboard();
+    setInterval(loadDashboard, 3000);
+});
+</script>
+{% endblock %}
