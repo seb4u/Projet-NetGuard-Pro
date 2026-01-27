@@ -1,43 +1,308 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Connexion — NetGuard Pro</title>
-    <link rel="stylesheet" href="/static/css/login.css">
-</head>
-<body>
+{% extends "base.html" %}
 
-<div class="login-container">
+{% block extra_css %}
+<style>
+    /* Background animé style SOC */
+    .soc-bg {
+        background:
+            radial-gradient(circle at 20% 50%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+            linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+        position: relative;
+        overflow: hidden;
+    }
 
-    <div class="login-card">
-        <h1>🛡️ NetGuard Pro</h1>
-        <p class="subtitle">Accès administrateur</p>
+    /* Grille digitale animée */
+    .soc-bg::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image:
+            linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        animation: gridMove 20s linear infinite;
+        pointer-events: none;
+    }
 
-        <p class="message">{{MESSAGE}}</p>
+    @keyframes gridMove {
+        0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
+        100% { transform: perspective(500px) rotateX(60deg) translateY(50px); }
+    }
 
-        <form method="post">
-            <div class="field">
-                <input type="text" name="username" placeholder="Nom d'utilisateur" required autofocus>
+    /* Carte avec effet néon */
+    .soc-card {
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(6, 182, 212, 0.2);
+        box-shadow:
+            0 0 40px rgba(6, 182, 212, 0.1),
+            inset 0 0 20px rgba(6, 182, 212, 0.05);
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Ligne néon animée en haut */
+    .soc-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #06b6d4, #3b82f6, #8b5cf6, transparent);
+        animation: scanline 3s linear infinite;
+    }
+
+    @keyframes scanline {
+        0% { left: -100%; }
+        100% { left: 100%; }
+    }
+
+    /* Logo avec halo pulsant */
+    .soc-logo {
+        position: relative;
+        background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%);
+        box-shadow: 0 0 30px rgba(6, 182, 212, 0.5);
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.4); }
+        50% { box-shadow: 0 0 40px rgba(6, 182, 212, 0.8), 0 0 60px rgba(59, 130, 246, 0.4); }
+    }
+
+    /* Champs de saisie style terminal */
+    .soc-input {
+        background: rgba(30, 41, 59, 0.8) !important;
+        border: 1px solid rgba(6, 182, 212, 0.3) !important;
+        color: #06b6d4 !important;
+        font-family: 'Courier New', monospace;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+    }
+
+    .soc-input:focus {
+        border-color: #06b6d4 !important;
+        box-shadow:
+            0 0 0 3px rgba(6, 182, 212, 0.1),
+            0 0 20px rgba(6, 182, 212, 0.3) !important;
+        outline: none;
+    }
+
+    .soc-input::placeholder {
+        color: rgba(6, 182, 212, 0.4) !important;
+    }
+
+    /* Bouton style alerte SOC */
+    .soc-btn {
+        background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important;
+        border: 1px solid rgba(220, 38, 38, 0.5) !important;
+        box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .soc-btn:hover {
+        box-shadow: 0 0 30px rgba(220, 38, 38, 0.6);
+        transform: translateY(-2px);
+    }
+
+    /* Effet de scan sur le bouton */
+    .soc-btn::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(
+            45deg,
+            transparent 30%,
+            rgba(255, 255, 255, 0.1) 50%,
+            transparent 70%
+        );
+        transform: rotate(45deg);
+        transition: all 0.5s;
+        opacity: 0;
+    }
+
+    .soc-btn:hover::after {
+        animation: btnScan 0.8s ease-in-out;
+    }
+
+    @keyframes btnScan {
+        0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); opacity: 0; }
+        50% { opacity: 1; }
+        100% { transform: translateX(100%) translateY(100%) rotate(45deg); opacity: 0; }
+    }
+
+    /* Texte glitch effect pour le titre */
+    .soc-title {
+        text-shadow:
+            0 0 10px rgba(6, 182, 212, 0.8),
+            0 0 20px rgba(6, 182, 212, 0.4);
+        letter-spacing: 2px;
+    }
+
+    /* Badge de sécurité */
+    .soc-badge {
+        background: rgba(6, 182, 212, 0.1);
+        border: 1px solid rgba(6, 182, 212, 0.3);
+        color: #06b6d4;
+        font-size: 0.7rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+
+    /* Particules flottantes */
+    .particle {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: rgba(6, 182, 212, 0.6);
+        border-radius: 50%;
+        animation: float 10s infinite linear;
+    }
+
+    @keyframes float {
+        0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { transform: translateY(-100px) translateX(100px); opacity: 0; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 soc-bg relative">
+    <!-- Particules décoratives -->
+    <div class="particle" style="left: 10%; animation-delay: 0s;"></div>
+    <div class="particle" style="left: 30%; animation-delay: 2s;"></div>
+    <div class="particle" style="left: 50%; animation-delay: 4s;"></div>
+    <div class="particle" style="left: 70%; animation-delay: 6s;"></div>
+    <div class="particle" style="left: 90%; animation-delay: 8s;"></div>
+
+    <div class="max-w-md w-full soc-card rounded-2xl p-8 relative z-10">
+        <!-- Badge de sécurité -->
+        <div class="flex justify-center mb-4">
+            <span class="soc-badge px-3 py-1 rounded-full">
+                <i class="fas fa-shield-alt mr-1"></i> Secure Access
+            </span>
+        </div>
+
+        <!-- Logo avec effet néon -->
+        <div class="text-center mb-6">
+            <div class="mx-auto h-20 w-20 soc-logo rounded-2xl flex items-center justify-center mb-4 transform rotate-3 hover:rotate-0 transition-transform duration-300">
+                <i class="fas fa-shield-virus text-3xl text-white"></i>
+            </div>
+            <h1 class="text-4xl font-bold text-white soc-title mb-2 tracking-wider">NetGuard Pro</h1>
+            <p class="text-cyan-400 text-sm font-mono tracking-widest uppercase opacity-80">Security Operations Center</p>
+            <div class="mt-2 h-px w-32 mx-auto bg-gradient-to-r from-transparent via-cyan-500 to-transparent"></div>
+        </div>
+
+        <form id="loginForm" class="space-y-5">
+            <div class="group">
+                <label class="block text-xs font-mono text-cyan-400 mb-2 uppercase tracking-wider">
+                    <i class="fas fa-user-secret mr-1"></i> Identifiant Opérateur
+                </label>
+                <div class="relative">
+                    <input id="username" name="username" type="text" required
+                        class="w-full px-4 py-3 rounded-lg soc-input text-sm"
+                        placeholder="ADMIN_ID">
+                    <div class="absolute right-3 top-3 text-cyan-600">
+                        <i class="fas fa-fingerprint"></i>
+                    </div>
+                </div>
             </div>
 
-            <div class="field">
-                <input type="password" name="password" placeholder="Mot de passe" required>
+            <div class="group">
+                <label class="block text-xs font-mono text-cyan-400 mb-2 uppercase tracking-wider">
+                    <i class="fas fa-key mr-1"></i> Clé d'Authentification
+                </label>
+                <div class="relative">
+                    <input id="password" name="password" type="password" required
+                        class="w-full px-4 py-3 rounded-lg soc-input text-sm"
+                        placeholder="••••••••">
+                    <div class="absolute right-3 top-3 text-cyan-600">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                </div>
             </div>
 
-            <input type="hidden" name="csrf_token" id="csrf_token">
-
-            <button type="submit">
-                🔐 Se connecter
+            <button type="submit"
+                class="w-full py-3 px-4 soc-btn text-white font-bold rounded-lg uppercase tracking-wider text-sm mt-6">
+                <i class="fas fa-sign-in-alt mr-2"></i> Authentification
             </button>
         </form>
 
-        <div class="footer">
-            NetGuard Pro © 2026 — Secure Monitoring
+        <div id="errorMsg" class="mt-4 text-red-400 text-center hidden font-mono text-sm bg-red-900/20 p-2 rounded border border-red-500/30">
+            <i class="fas fa-exclamation-triangle mr-1"></i> <span id="errorText"></span>
+        </div>
+
+        <!-- Footer technique -->
+        <div class="mt-6 pt-4 border-t border-cyan-900/30 text-center">
+            <p class="text-xs text-cyan-600/60 font-mono">
+                <i class="fas fa-server mr-1"></i>
+                <span id="systemStatus">Système opérationnel</span> |
+                <span class="text-cyan-400">v2.6.0</span>
+            </p>
         </div>
     </div>
-
 </div>
 
-<script src="/static/js/login.js"></script>
-</body>
-</html>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const btn = document.querySelector('.soc-btn');
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Vérification...';
+    btn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('username', document.getElementById('username').value);
+    formData.append('password', document.getElementById('password').value);
+
+    try {
+        const response = await fetch('/api/auth/login', { method: 'POST', body: formData });
+        const data = await response.json();
+
+        if (response.ok) {
+            btn.innerHTML = '<i class="fas fa-check mr-2"></i> Accès accordé';
+            btn.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%) !important';
+            btn.style.boxShadow = '0 0 30px rgba(5, 150, 105, 0.6)';
+
+            setTimeout(() => {
+                localStorage.setItem('access_token', data.access_token);
+                window.location.href = '/dashboard';
+            }, 500);
+        } else {
+            throw new Error('Auth failed');
+        }
+    } catch (error) {
+        btn.innerHTML = '<i class="fas fa-times mr-2"></i> Accès refusé';
+        btn.style.background = 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important';
+
+        const errorDiv = document.getElementById('errorMsg');
+        document.getElementById('errorText').textContent = 'Identifiants invalides - Tentative enregistrée';
+        errorDiv.classList.remove('hidden');
+
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> Authentification';
+            btn.disabled = false;
+        }, 2000);
+    }
+});
+
+// Animation du statut système
+setInterval(() => {
+    const status = document.getElementById('systemStatus');
+    status.style.opacity = status.style.opacity === '0.5' ? '1' : '0.5';
+}, 1000);
+</script>
+{% endblock %}
