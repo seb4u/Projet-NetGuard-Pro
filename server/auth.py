@@ -1,79 +1,48 @@
-from fastapi import APIRouter, Request, Form
-from fastapi.responses import RedirectResponse, HTMLResponse
-from datetime import datetime
-import secrets
+from datetime import datetime, timedelta
+from typing import Optional
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from server.config import settings
 
-from server.config import (
-    ADMIN_USERNAME,
-    ADMIN_PASSWORD_HASH,
-    pwd_context,
-    SESSION_TIMEOUT
-)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
-router = APIRouter()
 
-class SessionExpiredException(Exception):
-    pass
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
 
-def require_login(request: Request) -> bool:
-    session = request.session
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
-    if "user" not in session or "last_activity" not in session:
-        return False
 
-    last_activity = datetime.fromisoformat(session["last_activity"])
-    now = datetime.utcnow()
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
 
-    if now - last_activity > SESSION_TIMEOUT:
-        session.clear()
-        raise SessionExpiredException()
 
-    session["last_activity"] = now.isoformat()
-    return True
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
 
-@router.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
-    with open("server/templates/login.html", encoding="utf-8") as f:
-        html = f.read()
-
-    msg = ""
-    p = request.query_params
-    if p.get("expired") == "1":
-        msg = "Session expirée, veuillez vous reconnecter."
-    elif p.get("error") == "1":
-        msg = "Identifiants incorrects."
-    elif p.get("error") == "csrf":
-        msg = "Erreur CSRF détectée."
-
-    return html.replace("{{MESSAGE}}", msg)
-
-@router.get("/api/csrf-token")
-def csrf_token(request: Request):
-    token = secrets.token_hex(16)
-    request.session["csrf_token"] = token
-    return {"token": token}
-
-@router.post("/login")
-def login(
-    request: Request,
-    username: str = Form(...),
-    password: str = Form(...),
-    csrf_token: str = Form(...)
-):
-    if csrf_token != request.session.get("csrf_token"):
-        return RedirectResponse("/login?error=csrf", status_code=302)
-
-    if username != ADMIN_USERNAME or not verify_password(password, ADMIN_PASSWORD_HASH):
-        return RedirectResponse("/login?error=1", status_code=302)
-
-    request.session["user"] = username
-    request.session["last_activity"] = datetime.utcnow().isoformat()
-    return RedirectResponse("/dashboard", status_code=302)
-
-@router.get("/logout")
-def logout(request: Request):
-    request.session.clear()
-    return RedirectResponse("/login", status_code=302)
+    if username != settings.ADMIN_USERNAME:
+        raise credentials_exception
+    return username
